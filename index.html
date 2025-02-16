@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Text Extractor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .upload-section {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .upload-section.dragover {
+            border-color: #4CAF50;
+            background-color: #e8f5e9;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .result-section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .extracted-text {
+            white-space: pre-wrap;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            min-height: 100px;
+        }
+
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .error {
+            color: red;
+            margin: 10px 0;
+            display: none;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Text Extractor</h1>
+        <div class="upload-section" id="dropZone">
+            <p>Drag and drop an image here or click to select</p>
+            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
+            <img id="preview" class="preview-image" alt="Preview">
+        </div>
+        <button id="extractButton" disabled>Extract Text</button>
+        <div class="loading" id="loading">Processing image...</div>
+        <div class="error" id="error"></div>
+        <div class="result-section" id="resultSection">
+            <h2>Extracted Text:</h2>
+            <div class="extracted-text" id="extractedText"></div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const extractButton = document.getElementById('extractButton');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const resultSection = document.getElementById('resultSection');
+        const extractedText = document.getElementById('extractedText');
+
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        // Handle click to upload
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', () => {
+            handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            // Check file type
+            const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+            if (!validTypes.includes(file.type)) {
+                showError('Please upload a PNG or JPEG image.');
+                return;
+            }
+
+            // Check file size (4MB limit)
+            if (file.size > 4 * 1024 * 1024) {
+                showError('File size exceeds 4MB limit.');
+                return;
+            }
+
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                extractButton.disabled = false;
+                hideError();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        extractButton.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            showLoading();
+            hideError();
+            resultSection.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://localhost:5000/extract-text', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    extractedText.textContent = data.text;
+                    resultSection.style.display = 'block';
+                } else {
+                    showError(data.error || 'Failed to extract text.');
+                }
+            } catch (err) {
+                showError('Error connecting to the server.');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        function hideError() {
+            error.style.display = 'none';
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+            extractButton.disabled = true;
+        }
+
+        function hideLoading() {
+            loading.style.display = 'none';
+            extractButton.disabled = false;
+        }
+    </script>
+</body>
+</html>
